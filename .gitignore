@@ -1,0 +1,38 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Environment files. Only the *.example templates are tracked.
+.env
+.env.*
+!.env.example
+**/.env.example.local
+
+# Local runtime data. Anchored to the API app, so public media in apps/web is still tracked.
+/apps/api/media/
+/apps/api/staticfiles/
+*.log
+
+# Test output
+test-results/
+playwright-report/
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

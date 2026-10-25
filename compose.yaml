@@ -1,0 +1,83 @@
+# Local development stack: PostGIS, Django API and Next.js web.
+# Start with `make dev`. The API is published on host port 8001 because
+# port 8000 is often taken by other local tools.
+# The explicit project name keeps this stack separate from other Docker
+# projects that share the "dream-homes" directory name on the same machine.
+name: dreamhomes-local
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: dreamhomes
+      POSTGRES_USER: dreamhomes
+      POSTGRES_PASSWORD: dreamhomes
+    ports:
+      - "5433:5432"  # host 5433: port 5432 is often taken by a local PostgreSQL
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dreamhomes -d dreamhomes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: apps/api
+      args:
+        REQUIREMENTS: dev.txt
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DJANGO_SECRET_KEY: dev-only-not-a-secret
+      DEBUG: "True"
+      ALLOWED_HOSTS: localhost,127.0.0.1,api
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgis://dreamhomes:dreamhomes@db:5432/dreamhomes
+    ports:
+      - "8001:8000"
+    # Run as the host user (uid 1000 here) so files written by the container,
+    # such as new migrations, are owned by you on the host.
+    user: "1000:1000"
+    volumes:
+      - ./apps/api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Production build of the web app: fast and smooth. Served on http://localhost:3000.
+  web:
+    build:
+      context: apps/web
+      args:
+        NEXT_PUBLIC_CONTACT_PHONE: ""
+        NEXT_PUBLIC_CONTACT_EMAIL: ""
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # Development server with hot reload, for editing the web app. Start with: docker compose --profile webdev up web-dev
+  web-dev:
+    image: node:22-alpine
+    profiles: ["webdev"]
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- -H 0.0.0.0"
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./apps/web:/app
+      - web-node-modules:/app/node_modules
+
+volumes:
+  db-data:
+  web-node-modules:
